@@ -6,15 +6,19 @@ import { memberRoutes } from "./routes/members.ts";
 import { partyRoutes } from "./routes/parties.ts";
 
 function allowedOrigins(): string[] {
-  const extras = (Deno.env.get("FRONTEND_ORIGIN") ?? "")
+  const extras = [
+    Deno.env.get("FRONTEND_ORIGIN") ?? "",
+    Deno.env.get("DEPLOY_FRONTEND") ?? "",
+  ]
+    .join(",")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
-  return [
+  return [...new Set([
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     ...extras,
-  ];
+  ])];
 }
 
 const origins = allowedOrigins();
