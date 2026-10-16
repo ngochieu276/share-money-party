@@ -29,19 +29,19 @@ export function MatchList({
 
   return (
     <>
-      <ul className="space-y-3">
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
         {matches.map((match) => {
           const teamA = match.players.filter((p) => p.team === "A");
           const teamB = match.players.filter((p) => p.team === "B");
           return (
             <li
               key={match.id}
-              className="rounded-xl border bg-card px-4 py-3"
+              className="h-full min-w-0 rounded-xl border bg-card px-4 py-3"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
+              <div className="flex h-full items-start justify-between gap-3">
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">{formatDate(match.date)}</p>
-                  <p className="mt-1 text-sm">
+                  <p className="mt-1 text-sm wrap-break-word">
                     <span className="font-medium">
                       {teamA.map((p) => p.name).join(", ")}
                     </span>
@@ -73,6 +73,7 @@ export function MatchList({
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="shrink-0"
                       aria-label={t("common.more")}
                       onClick={(event) => event.stopPropagation()}
                     >
