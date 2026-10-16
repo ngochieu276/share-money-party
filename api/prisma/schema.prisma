@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  runtime  = "deno"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  members      Member[]
+  parties      Party[]
+}
+
+model Member {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  attendances PartyAttendee[]
+  matchSides  MatchPlayer[]
+
+  @@index([userId])
+}
+
+model Party {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  totalBill Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  attendees PartyAttendee[]
+  matches   Match[]
+
+  @@index([userId])
+}
+
+model PartyAttendee {
+  partyId  String
+  memberId String
+  party    Party  @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([partyId, memberId])
+  @@index([memberId])
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  partyId   String
+  date      DateTime
+  betAmount Int
+  winner    String
+  createdAt DateTime @default(now())
+  party     Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  players   MatchPlayer[]
+
+  @@index([partyId])
+}
+
+model MatchPlayer {
+  matchId  String
+  memberId String
+  team     String
+  match    Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([matchId, memberId])
+  @@index([memberId])
+}

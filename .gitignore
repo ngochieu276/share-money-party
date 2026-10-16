@@ -1,0 +1,28 @@
+# env
+.env
+.env.local
+.env.*.local
+
+# deps
+node_modules/
+web/node_modules/
+api/node_modules/
+
+# next
+web/.next/
+web/out/
+
+# prisma generated client
+api/generated/
+
+# lockfiles for Deno are committed when generated
+
+# os / ide
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# debug
+npm-debug.log*
+.turbo/
