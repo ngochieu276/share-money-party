@@ -13,29 +13,31 @@ const teamSchema = z.array(z.string().min(1)).min(1).max(100);
 
 const matchSchema = z.object({
   date: dateSchema,
-  betAmount: z.number().int().min(1).max(1_000_000_000),
+  betAmount: z.coerce.number().finite(),
+  notes: z.string().trim().max(2000).optional().default(""),
   teamA: teamSchema,
   teamB: teamSchema,
   winner: z.enum(["A", "B"]),
 });
 
-function validateTeams(attendeeIds: Set<string>, teamA: string[], teamB: string[]) {
+function validateTeams(memberIds: Set<string>, teamA: string[], teamB: string[]) {
   const a = [...new Set(teamA)];
   const b = [...new Set(teamB)];
   if (a.length === 0 || b.length === 0) return "Each team needs at least one member";
   const overlap = a.filter((id) => b.includes(id));
   if (overlap.length > 0) return "A member cannot be on both teams";
   for (const id of [...a, ...b]) {
-    if (!attendeeIds.has(id)) return "Match players must attend the party";
+    if (!memberIds.has(id)) return "Unknown member";
   }
   return { teamA: a, teamB: b };
 }
 
-async function partyWithAttendees(partyId: string) {
-  return await prisma.party.findUnique({
-    where: { id: partyId },
-    include: { attendees: true },
+async function ownedMemberIds(userId: string) {
+  const members = await prisma.member.findMany({
+    where: { userId },
+    select: { id: true },
   });
+  return new Set(members.map((row) => row.id));
 }
 
 export const nestedMatchRoutes = new Hono<AppEnv>();
@@ -48,18 +50,17 @@ nestedMatchRoutes.post("/:partyId/matches", async (c) => {
   const partyId = c.req.param("partyId");
   const existing = await ownedParty(userId, partyId);
   if (!existing) return c.json({ error: "Not found" }, 404);
-  const party = await partyWithAttendees(partyId);
-  if (!party) return c.json({ error: "Not found" }, 404);
-  const attendeeIds = new Set(party.attendees.map((row) => row.memberId));
-  const teams = validateTeams(attendeeIds, parsed.data.teamA, parsed.data.teamB);
+  const memberIds = await ownedMemberIds(userId);
+  const teams = validateTeams(memberIds, parsed.data.teamA, parsed.data.teamB);
   if (typeof teams === "string") return c.json({ error: teams }, 400);
 
   await prisma.match.create({
     data: {
       partyId,
       date: calendarDayToUtc(parsed.data.date),
-      betAmount: parsed.data.betAmount,
+      betAmount: Math.round(parsed.data.betAmount),
       winner: parsed.data.winner,
+      notes: parsed.data.notes,
       players: {
         create: [
           ...teams.teamA.map((memberId) => ({ memberId, team: "A" })),
@@ -86,10 +87,8 @@ matchRoutes.patch("/:id", async (c) => {
   const id = c.req.param("id");
   const existing = await ownedMatch(userId, id);
   if (!existing) return c.json({ error: "Not found" }, 404);
-  const party = await partyWithAttendees(existing.partyId);
-  if (!party) return c.json({ error: "Not found" }, 404);
-  const attendeeIds = new Set(party.attendees.map((row) => row.memberId));
-  const teams = validateTeams(attendeeIds, parsed.data.teamA, parsed.data.teamB);
+  const memberIds = await ownedMemberIds(userId);
+  const teams = validateTeams(memberIds, parsed.data.teamA, parsed.data.teamB);
   if (typeof teams === "string") return c.json({ error: teams }, 400);
 
   await prisma.$transaction(async (tx) => {
@@ -98,8 +97,9 @@ matchRoutes.patch("/:id", async (c) => {
       where: { id },
       data: {
         date: calendarDayToUtc(parsed.data.date),
-        betAmount: parsed.data.betAmount,
+        betAmount: Math.round(parsed.data.betAmount),
         winner: parsed.data.winner,
+        notes: parsed.data.notes,
         players: {
           create: [
             ...teams.teamA.map((memberId) => ({ memberId, team: "A" })),

@@ -23,6 +23,7 @@ export function serializeParty(
       date: Date;
       betAmount: number;
       winner: string;
+      notes: string;
       createdAt: Date;
       players: { team: string; member: { id: string; name: string } }[];
     }[];
@@ -42,6 +43,7 @@ export function serializeParty(
       date: match.date.toISOString(),
       betAmount: match.betAmount,
       winner: match.winner,
+      notes: match.notes,
       createdAt: match.createdAt.toISOString(),
       players: match.players.map((player) => ({
         memberId: player.member.id,

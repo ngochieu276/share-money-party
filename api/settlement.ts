@@ -11,6 +11,7 @@ export type SettlementMatch = {
   date: Date;
   betAmount: number;
   winner: Team;
+  notes: string;
   players: SettlementPlayer[];
 };
 
@@ -19,11 +20,24 @@ export type SettlementAttendee = {
   name: string;
 };
 
+export type BettingLossEntry = {
+  matchId: string;
+  amount: number;
+  date: Date;
+  betAmount: number;
+  winner: Team;
+  notes: string;
+  teamA: string[];
+  teamB: string[];
+};
+
 export type SettlementRow = {
   memberId: string;
   name: string;
+  attended: boolean;
   baseAmount: number;
   bettingLoss: number;
+  losses: BettingLossEntry[];
   total: number;
 };
 
@@ -59,39 +73,69 @@ export function computeSettlement(
   attendees: SettlementAttendee[],
   matches: SettlementMatch[],
 ): Settlement {
+  const attendeeIds = new Set(attendees.map((row) => row.id));
+  const people = new Map<string, SettlementAttendee>();
+  for (const attendee of attendees) people.set(attendee.id, attendee);
+  for (const match of matches) {
+    for (const player of match.players) {
+      if (!people.has(player.memberId)) {
+        people.set(player.memberId, { id: player.memberId, name: player.name });
+      }
+    }
+  }
+
   const n = attendees.length;
   const s0 = totalBill;
   const s1 = matches.reduce((sum, match) => sum + match.betAmount, 0);
   const s2 = s0 - s1;
+  const attendeeOrder = [...attendees].sort((a, b) => a.id.localeCompare(b.id));
   const bases = splitInteger(s2, n);
-  const a0 = n > 0 ? bases[0] ?? 0 : 0;
+  const baseById = new Map<string, number>();
+  attendeeOrder.forEach((attendee, index) => {
+    baseById.set(attendee.id, bases[index] ?? 0);
+  });
 
-  const lossByMember = new Map<string, number>();
-  for (const attendee of attendees) lossByMember.set(attendee.id, 0);
+  const lossesByMember = new Map<string, BettingLossEntry[]>();
+  for (const person of people.values()) lossesByMember.set(person.id, []);
 
   for (const match of matches) {
     const lost = losingTeam(match.winner);
+    const teamA = match.players
+      .filter((player) => player.team === "A")
+      .map((player) => player.name);
+    const teamB = match.players
+      .filter((player) => player.team === "B")
+      .map((player) => player.name);
     const losers = match.players
-      .filter((player) => player.team === lost && lossByMember.has(player.memberId))
+      .filter((player) => player.team === lost && lossesByMember.has(player.memberId))
       .sort((a, b) => a.memberId.localeCompare(b.memberId));
     const shares = splitInteger(match.betAmount, losers.length);
     losers.forEach((player, index) => {
-      lossByMember.set(
-        player.memberId,
-        (lossByMember.get(player.memberId) ?? 0) + (shares[index] ?? 0),
-      );
+      lossesByMember.get(player.memberId)?.push({
+        matchId: match.id,
+        amount: shares[index] ?? 0,
+        date: match.date,
+        betAmount: match.betAmount,
+        winner: match.winner,
+        notes: match.notes,
+        teamA,
+        teamB,
+      });
     });
   }
 
-  const ordered = [...attendees].sort((a, b) => a.id.localeCompare(b.id));
-  const rows: SettlementRow[] = ordered.map((attendee, index) => {
-    const baseAmount = bases[index] ?? 0;
-    const bettingLoss = lossByMember.get(attendee.id) ?? 0;
+  const rows: SettlementRow[] = [...people.values()].map((person) => {
+    const attended = attendeeIds.has(person.id);
+    const baseAmount = attended ? (baseById.get(person.id) ?? 0) : 0;
+    const losses = lossesByMember.get(person.id) ?? [];
+    const bettingLoss = losses.reduce((sum, entry) => sum + entry.amount, 0);
     return {
-      memberId: attendee.id,
-      name: attendee.name,
+      memberId: person.id,
+      name: person.name,
+      attended,
       baseAmount,
       bettingLoss,
+      losses,
       total: baseAmount + bettingLoss,
     };
   });

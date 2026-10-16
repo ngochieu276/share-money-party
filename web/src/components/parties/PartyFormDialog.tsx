@@ -72,11 +72,12 @@ export function PartyFormDialog({
       <form
         id="party-form"
         className="space-y-4"
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit({
             date,
-            totalBill: Number(totalBill) || 0,
+            totalBill: Number(totalBill.replace(/[^\d.-]/g, "")) || 0,
             attendeeIds,
           });
         }}
@@ -96,12 +97,10 @@ export function PartyFormDialog({
             <Label htmlFor="party-bill">{t("parties.totalBill")}</Label>
             <Input
               id="party-bill"
-              type="number"
-              min={0}
-              step={1000}
+              type="text"
+              inputMode="numeric"
               value={totalBill}
               onChange={(event) => setTotalBill(event.target.value)}
-              required
             />
           </div>
         </div>

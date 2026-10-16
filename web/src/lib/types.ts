@@ -23,6 +23,7 @@ export type Match = {
   date: string;
   betAmount: number;
   winner: "A" | "B";
+  notes: string;
   createdAt: string;
   players: MatchPlayer[];
 };
@@ -37,11 +38,24 @@ export type Party = {
   matches: Match[];
 };
 
+export type BettingLossEntry = {
+  matchId: string;
+  amount: number;
+  date: string;
+  betAmount: number;
+  winner: "A" | "B";
+  notes: string;
+  teamA: string[];
+  teamB: string[];
+};
+
 export type SettlementRow = {
   memberId: string;
   name: string;
+  attended: boolean;
   baseAmount: number;
   bettingLoss: number;
+  losses: BettingLossEntry[];
   total: number;
 };
 

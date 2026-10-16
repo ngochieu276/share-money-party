@@ -37,6 +37,7 @@ import { toast } from "sonner";
 type MatchPayload = {
   date: string;
   betAmount: number;
+  notes: string;
   teamA: string[];
   teamB: string[];
   winner: "A" | "B";
@@ -83,6 +84,16 @@ export function PartyDetailPage() {
       setEditOpen(false);
       toast.success(t("parties.updated"));
     },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+
+  const updateAttendance = useMutation({
+    mutationFn: (attendeeIds: string[]) =>
+      api<PartyResponse>(`/parties/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ attendeeIds }),
+      }),
+    onSuccess: (data) => applyParty(data.party),
     onError: (err) => toast.error(errorMessage(err)),
   });
 
@@ -190,8 +201,20 @@ export function PartyDetailPage() {
 
       <section className="mb-10">
         <h2 className="mb-1 font-serif text-2xl">{t("settlement.title")}</h2>
-        <p className="mb-4 text-sm text-muted-foreground">{t("settlement.subtitle")}</p>
-        {settlement ? <SettlementTable settlement={settlement} /> : <PageLoading />}
+        {settlement ? (
+          <SettlementTable
+            settlement={settlement}
+            pending={updateAttendance.isPending}
+            onToggleAttended={(memberId, attended) => {
+              const ids = new Set(party.attendees.map((row) => row.id));
+              if (attended) ids.add(memberId);
+              else ids.delete(memberId);
+              updateAttendance.mutate([...ids]);
+            }}
+          />
+        ) : (
+          <PageLoading />
+        )}
       </section>
 
       <section>
@@ -228,6 +251,7 @@ export function PartyDetailPage() {
           }
         }}
         party={party}
+        members={membersQuery.data?.members ?? []}
         match={editingMatch}
         pending={createMatch.isPending || updateMatch.isPending}
         onSubmit={(values) => {

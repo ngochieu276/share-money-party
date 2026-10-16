@@ -59,6 +59,14 @@ export function MatchList({
                       {t("matches.lost", { amount: formatMoney(match.betAmount) })}
                     </span>
                   </div>
+                  {match.notes ? (
+                    <div className="mt-3">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {t("matches.notes")}
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm">{match.notes}</p>
+                    </div>
+                  ) : null}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

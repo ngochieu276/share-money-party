@@ -13,14 +13,14 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const createSchema = z.object({
   date: dateSchema,
-  totalBill: z.number().int().min(0).max(1_000_000_000).optional(),
+  totalBill: z.coerce.number().finite().optional(),
   attendeeIds: z.array(z.string().min(1)).min(1).max(200),
 });
 
 const updateSchema = z.object({
   date: dateSchema.optional(),
-  totalBill: z.number().int().min(0).max(1_000_000_000).optional(),
-  attendeeIds: z.array(z.string().min(1)).min(1).max(200).optional(),
+  totalBill: z.coerce.number().finite().optional(),
+  attendeeIds: z.array(z.string().min(1)).max(200).optional(),
 });
 
 export const partyRoutes = new Hono<AppEnv>();
@@ -57,7 +57,7 @@ partyRoutes.post("/", async (c) => {
     data: {
       userId,
       date: calendarDayToUtc(parsed.data.date),
-      totalBill: parsed.data.totalBill ?? 0,
+      totalBill: Math.round(parsed.data.totalBill ?? 0),
       attendees: {
         create: attendeeIds.map((memberId) => ({ memberId })),
       },
@@ -106,30 +106,15 @@ partyRoutes.patch("/:id", async (c) => {
         data: attendeeIds.map((memberId) => ({ partyId: id, memberId })),
         skipDuplicates: true,
       });
-      await tx.matchPlayer.deleteMany({
-        where: { match: { partyId: id }, memberId: { notIn: attendeeIds } },
-      });
-      const matches = await tx.match.findMany({
-        where: { partyId: id },
-        include: { players: true },
-      });
-      const emptyTeamIds = matches
-        .filter((match) => {
-          const teamA = match.players.some((p) => p.team === "A");
-          const teamB = match.players.some((p) => p.team === "B");
-          return !teamA || !teamB;
-        })
-        .map((match) => match.id);
-      if (emptyTeamIds.length > 0) {
-        await tx.match.deleteMany({ where: { id: { in: emptyTeamIds } } });
-      }
     }
 
     return await tx.party.update({
       where: { id },
       data: {
         date: parsed.data.date ? calendarDayToUtc(parsed.data.date) : undefined,
-        totalBill: parsed.data.totalBill,
+        totalBill: parsed.data.totalBill === undefined
+          ? undefined
+          : Math.round(parsed.data.totalBill),
       },
       include: partyDetailInclude,
     });
@@ -166,6 +151,7 @@ partyRoutes.get("/:id/settlement", async (c) => {
       date: new Date(match.date),
       betAmount: match.betAmount,
       winner: match.winner as Team,
+      notes: match.notes,
       players: match.players.map((player) => ({
         memberId: player.memberId,
         name: player.name,
